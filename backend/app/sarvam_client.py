@@ -235,12 +235,13 @@ class SarvamClient:
                 ensure_ascii=False,
             )
             resp = self.client.chat.completions(
-                model="sarvam-105b-conversations",
+                model="sarvam-105b",
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
                 response_format={"type": "json_object"},
+                reasoning_effort="none",
                 temperature=0.2,
             )
             content = resp.choices[0].message.content or "{}"
