@@ -181,7 +181,7 @@ Checked against the official docs during the build:
 | Speech-to-text | `saaras:v4`, `POST /speech-to-text` | Uses `mode="transcribe"`; language auto-detected when not supplied. |
 | Text-to-speech | `bulbul:v4-flash`, `POST /text-to-speech` | Response is an `audios` array of **base64** WAV strings; decoded server-side. |
 | Document extraction | Sarvam Vision 2.1, `POST /doc-ai/v1/job/extract` | Async job: submit → poll status → fetch results. |
-| Reasoning | `sarvam-105b`, `POST /v1/chat/completions` | Uses `response_format={"type":"json_object"}` and `reasoning_effort="none"`. |
+| Reasoning | `sarvam-105b-conversations`, `POST /v1/chat/completions` | Uses `response_format={"type":"json_object"}` and `max_tokens=4096`. The full `sarvam-105b` reasoning model is available but spends its completion budget on reasoning tokens; with a large claim payload it can exceed the HTTP read timeout, so the conversations variant is the demo-safe default. |
 
 **Uncertainty / discrepancy:** the Doc AI extract docs list a `language` parameter, but the installed `sarvamai 0.1.42` SDK does not expose it on `doc_ai.extract()`. Claim-It omits it and relies on auto-detection. If you upgrade the SDK, pass `language` there if supported.
 
@@ -250,6 +250,19 @@ analyze: verdicts 11 | gaps 6 | covered 121230.0 | patient_pay 33470.0
 draft: सेवा में, | chars: 757
 speak: 200 | mock header: true | bytes: 0
 ```
+
+Live Sarvam smoke test (real key, sample pack):
+
+```text
+health: live | chat: sarvam-105b-conversations
+tts: 200 | audio/wav RIFF | 148220 bytes | 1.0s
+stt: 200 | Hindi transcript | 0.6s
+parse: BSG-HS-2025-88421 | clauses 9 | line items 14 | total 160400.0 | 16.1s
+analyze: 14 verdicts | 4 gaps | covered 105030.0 | patient_pay 55370.0 | 7.7s
+draft: 727 chars | 0.1s
+```
+
+Live extraction can legitimately differ from the canned scenario (for example, it itemises the handwritten pharmacy bill into extra lines). Mock mode remains the deterministic demo path.
 
 ---
 

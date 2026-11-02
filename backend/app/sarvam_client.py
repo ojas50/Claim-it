@@ -219,10 +219,21 @@ class SarvamClient:
         try:
             system = (
                 "You are Claim-It, an insurance claim copilot for Indian health/accident claims. "
-                "Return ONLY valid JSON. For every bill line item give a verdict (covered/partially_covered/not_covered/unclear) "
-                "with covered_amount, confidence (0-1), clause_id, clause_text (exact quote or closest), and reasoning. "
-                "Detect gaps/mismatches and missing documents. Compute billed, admissible, 10% copay if non-network, covered, patient_pay. "
-                "Never give legal/financial advice beyond estimates. Include a short disclaimer."
+                "Return ONLY a valid JSON object, no markdown. Use exactly this schema:\n"
+                "{\n"
+                '  "facts": {"patient_name": str, "hospital_name": str, "incident_date": str, "claim_type": str, "summary": str},\n'
+                '  "verdicts": [{"line_id": str, "verdict": "covered|partially_covered|not_covered|unclear", '
+                '"covered_amount": number, "confidence": number, "clause_id": str, "clause_text": str, "reasoning": str}],\n'
+                '  "gaps": [{"id": str, "title": str, "detail": str, "severity": "high|medium|low", "action": str}],\n'
+                '  "summary": str,\n'
+                '  "disclaimer": str\n'
+                "}\n"
+                "Rules: emit one verdict for EVERY bill line, using its exact line_id. "
+                "Use the exact clause_id and clause_text from the policy for the clause that decides the line. "
+                "covered_amount is the INR amount the insurer may pay for that line (0 if not covered). "
+                "covered = full amount; partially_covered = sub-limit/co-pay applied; unclear = needs a human. "
+                "Detect missing or mismatched documents (discharge summary, pre-authorisation, prescriptions, ID, name/date mismatches) "
+                "with a concrete action for each. Never give legal or financial advice beyond an estimate."
             )
             user = json.dumps(
                 {
@@ -230,22 +241,39 @@ class SarvamClient:
                     "narration": narration,
                     "policy": policy,
                     "bill": bill,
-                    "instructions": "Use the provided clauses. Cite exact clause text when possible.",
+                    "line_ids": [li.get("id") for li in (bill.get("line_items") or [])],
+                    "clause_ids": [c.get("id") for c in (policy.get("clauses") or [])],
+                    "instructions": (
+                        "Use only the provided line_ids and clause_ids. Copy clause_text verbatim from the matching clause. "
+                        "Return JSON only."
+                    ),
                 },
                 ensure_ascii=False,
             )
+            # sarvam-105b spends its completion budget on reasoning and can exceed the HTTP read
+            # timeout for a long claim. The conversations variant returns structured JSON in a few
+            # seconds, which is what a live demo needs.
             resp = self.client.chat.completions(
-                model="sarvam-105b",
+                model="sarvam-105b-conversations",
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
                 response_format={"type": "json_object"},
-                reasoning_effort="none",
+                max_tokens=4096,
                 temperature=0.2,
             )
             content = resp.choices[0].message.content or "{}"
-            data = json.loads(content)
+            data = _loads_json_object(content)
+            if not data.get("verdicts"):
+                alt = (
+                    data.get("line_items_verdict")
+                    or data.get("line_item_verdicts")
+                    or data.get("line_items")
+                    or []
+                )
+                if isinstance(alt, list):
+                    data["verdicts"] = alt
             data.setdefault("mode", "live")
             data.setdefault("disclaimer", mock_data.DISCLAIMER)
             return data
@@ -282,6 +310,27 @@ class SarvamClient:
             raise RuntimeError(f"sarvam tts failed: {getattr(exc, 'status_code', None)} {getattr(exc, 'body', exc)}")
         except Exception as exc:
             raise RuntimeError(f"sarvam tts failed: {exc}")
+
+
+def _loads_json_object(content: str) -> dict[str, Any]:
+    content = (content or "").strip()
+    try:
+        data = json.loads(content)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    # Try to extract a JSON object if there's extra text
+    start = content.find("{")
+    end = content.rfind("}")
+    if start >= 0 and end > start:
+        try:
+            data = json.loads(content[start : end + 1])
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+    return {}
 
 
 def _guess_audio_mime(filename: str) -> str:

@@ -58,7 +58,7 @@ def health():
         "has_key": bool(config.SARVAM_API_KEY),
         "models": {
             "stt": "saaras:v4",
-            "chat": "sarvam-105b",
+            "chat": "sarvam-105b-conversations",
             "tts": "bulbul:v4-flash",
             "documents": "Sarvam Vision 2.1 / doc-ai extract",
         },
