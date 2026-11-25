@@ -86,7 +86,10 @@ claim-it/
 │  │  ├─ sarvam_client.py    single Sarvam integration module
 │  │  ├─ mock_data.py        canonical demo scenario and canned responses
 │  │  └─ letters.py          multilingual claim-letter templates
-│  └─ requirements.txt
+│  ├─ tests/                 pytest API + normalization + Sarvam client tests
+│  ├─ scripts/smoke_test.py  repeatable end-to-end HTTP check
+│  ├─ requirements.txt
+│  └─ requirements-dev.txt   pytest + httpx for tests only
 ├─ frontend/
 │  ├─ src/
 │  │  ├─ App.jsx             wizard state, step gating, print area
@@ -234,6 +237,14 @@ Mock `/api/speak` returns HTTP 200, `X-Claimit-Mock: true` and zero bytes. The f
 # Backend syntax
 cd backend
 python -m py_compile app/*.py
+
+# Backend unit + API tests (29 tests, mock mode, no key needed)
+python -m pip install -r requirements-dev.txt
+python -m pytest tests -q
+
+# Repeatable end-to-end HTTP check (backend must be running)
+python scripts/smoke_test.py
+# Against a live-mode backend: python scripts/smoke_test.py --base-url http://127.0.0.1:8001
 
 # Frontend production build
 cd ../frontend

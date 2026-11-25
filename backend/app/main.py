@@ -286,7 +286,7 @@ def _normalize_analysis(raw: dict, req: AnalyzeRequest) -> AnalysisResponse:
 
     summary = str(raw.get("summary") or "").strip() or (
         f"{len([v for v in verdicts if v.verdict == 'covered'])} of {len(verdicts)} line items are covered. "
-        f"Estimated payable amount is Rs. {totals.covered:,.0f}; the patient may need to pay about Rs. {totals.patient_pay:,.0f}. "
+        f"Estimated payable amount is Rs. {totals['covered']:,.0f}; the patient may need to pay about Rs. {totals['patient_pay']:,.0f}. "
         f"{len(gaps)} document issue(s) need attention before submission."
     )
     return AnalysisResponse(
